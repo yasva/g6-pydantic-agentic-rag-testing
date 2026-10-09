@@ -1,0 +1,34 @@
+============================================================ test session starts =============================================================
+platform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0 -- <virtual-environment>\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: .
+plugins: anyio-4.15.1, logfire-5.1.1, platformdirs-4.12.3, cov-7.1.0
+collected 11 items
+
+test_typed_rag.py::TypedRagTests::test_agent_calls_retrieve_and_returns_typed_cited_answer PASSED                                       [  9%]
+test_typed_rag.py::TypedRagTests::test_answer_model_requires_citations_when_answered PASSED                                             [ 18%]
+test_typed_rag.py::TypedRagTests::test_chunk_text_uses_stable_overlap PASSED                                                            [ 27%]
+test_typed_rag.py::TypedRagTests::test_forged_citation_forces_refusal PASSED                                                            [ 36%]
+test_typed_rag.py::TypedRagTests::test_html_to_text_ignores_scripts_and_styles PASSED                                                   [ 45%]
+test_typed_rag.py::TypedRagTests::test_local_store_ranks_relevant_evidence PASSED                                                       [ 54%]
+test_typed_rag.py::TypedRagTests::test_model_resolution_supports_both_providers PASSED                                                  [ 63%]
+test_typed_rag.py::TypedRagTests::test_out_of_corpus_question_refuses_without_model_request PASSED                                      [ 72%]
+test_typed_rag.py::TypedRagTests::test_pdf_text_is_extracted_and_indexed PASSED                                                         [ 81%]
+test_typed_rag.py::TypedRagTests::test_private_docs_urls_are_rejected SUBPASSED(url='http://localhost/docs') [ 90%]
+test_typed_rag.py::TypedRagTests::test_private_docs_urls_are_rejected SUBPASSED(url='http://127.0.0.1/admin') [ 90%]
+test_typed_rag.py::TypedRagTests::test_private_docs_urls_are_rejected SUBPASSED(url='http://[::1]/admin') [ 90%]
+test_typed_rag.py::TypedRagTests::test_private_docs_urls_are_rejected SUBPASSED(url='http://169.254.169.254/latest/meta-data') [ 90%]
+test_typed_rag.py::TypedRagTests::test_private_docs_urls_are_rejected SUBPASSED(url='http://10.0.0.4/internal') [ 90%]
+test_typed_rag.py::TypedRagTests::test_private_docs_urls_are_rejected PASSED                                                            [ 90%]
+test_typed_rag.py::TypedRagTests::test_retrieve_evidence_reports_threshold_decision PASSED                                              [100%]
+
+=============================================================== tests coverage ===============================================================
+______________________________________________ coverage: platform win32, python 3.12.10-final-0 ______________________________________________
+
+Name       Stmts   Miss  Cover   Missing
+----------------------------------------
+agent.py     115     13    89%   38, 55, 63, 160, 167-171, 210, 212, 228, 236
+rag.py       232     53    77%   137, 139, 143, 150, 195, 223, 226-228, 231-232, 235-236, 241-243, 260, 264, 267-268, 282, 296, 303, 307, 318, 324, 344, 376, 415, 417, 425-430, 440-441, 446-462
+----------------------------------------
+TOTAL        347     66    81%
+=================================================== 11 passed, 5 subtests passed in 8.43s ====================================================
