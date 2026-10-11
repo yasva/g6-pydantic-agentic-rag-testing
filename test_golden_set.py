@@ -16,6 +16,8 @@
 # Follow the work allocation in docs/golden-set-work-allocation.md.
 
 
+
+
 # SHARED TEST DOCUMENTS
 #
 # Use these same synthetic documents when proposing initial cases:
@@ -31,6 +33,8 @@
 # If a proposed case needs additional or conflicting information, describe the
 # proposed change in the Word proposal sheet. The group must approve changes so
 # all final tests use the same agreed test documents.
+
+
 
 
 # WORK ALLOCATION — INITIAL PROPOSALS
@@ -146,3 +150,148 @@
 #         environment, and results.
 # TODO 8: Compare baseline and extended results in the same environment.
 #         Record findings, blockers, limitations, and remaining work.
+
+
+# Golden Set Tests — Insufficient Evidence and Refusal
+# Proposed by: Marjan
+#
+# Shared test documents:
+# benefits.txt
+# expenses.txt
+#
+# G05: Unrelated question — expected refusal
+# G06: Related document but insufficient evidence — expected refusal
+
+import asyncio
+import unittest
+
+from pydantic_ai import models
+
+from agent import (
+    RagDependencies,
+    REFUSAL_TEXT,
+    answer_question,
+    retrieve_evidence,
+)
+
+from rag import HashingEmbeddingBackend, InMemoryVectorStore
+
+
+class GoldenSetRefusalTests(unittest.TestCase):
+
+    def run_async(self, awaitable):
+        return asyncio.run(awaitable)
+
+    def make_store(self):
+        return InMemoryVectorStore(
+            HashingEmbeddingBackend(dimensions=512)
+        )
+
+    def add_shared_documents(self, store):
+        self.run_async(
+            store.add_document(
+                "benefits.txt",
+                "Eligible employees receive twelve weeks of paid parental leave "
+                "after six months of employment."
+            )
+        )
+
+        self.run_async(
+            store.add_document(
+                "expenses.txt",
+                "Employees must submit expense reports within thirty days after "
+                "business travel. The daily meal allowance is 70 dollars."
+            )
+        )
+
+    def make_deps(self):
+        store = self.make_store()
+        self.add_shared_documents(store)
+
+        return RagDependencies(
+            store=store,
+            min_relevance=0.2,
+            top_k=3,
+        )
+
+    # ---------------------------------------------------------
+    # G05: No relevant evidence exists
+    # ---------------------------------------------------------
+
+    def test_g05_refuses_unrelated_question(self):
+        deps = self.make_deps()
+        question = "Who won the 1978 World Cup?"
+
+        # Prevent external AI model requests.
+        previous = models.ALLOW_MODEL_REQUESTS
+        models.ALLOW_MODEL_REQUESTS = False
+
+        try:
+            answer = self.run_async(
+                answer_question(question, deps)
+            )
+        finally:
+            models.ALLOW_MODEL_REQUESTS = previous
+
+        # The system must refuse the unsupported question.
+        self.assertFalse(
+            answer.answered,
+            "G05: The system should refuse an unsupported question."
+        )
+
+        # A refused answer must not contain citations.
+        self.assertEqual(
+            [],
+            answer.citations,
+            "G05: A refused answer should not contain citations."
+        )
+
+        # The system must explain that evidence is insufficient.
+        self.assertEqual(
+            REFUSAL_TEXT,
+            answer.text,
+            "G05: The refusal message should clearly explain "
+            "that evidence is insufficient."
+        )
+
+    # ---------------------------------------------------------
+    # G06: Related evidence exists but is not sufficient
+    # ---------------------------------------------------------
+
+    def test_g06_insufficient_annual_allowance_evidence(self):
+        deps = self.make_deps()
+        question = "What is the annual meal allowance?"
+
+        result = self.run_async(
+            retrieve_evidence(deps, question)
+        )
+
+        # The related expenses document should be retrieved.
+        self.assertTrue(
+            any(
+                chunk.source == "expenses.txt"
+                for chunk in result.chunks
+            ),
+            "G06: Expected to retrieve the related expenses document."
+        )
+
+        # The document provides a daily allowance, not an annual one.
+        self.assertTrue(
+            any(
+                "daily meal allowance is 70 dollars" in chunk.text.lower()
+                for chunk in result.chunks
+                if chunk.source == "expenses.txt"
+            ),
+            "G06: Expected evidence about the daily allowance."
+        )
+
+        # The retrieved information does not answer the annual question.
+        self.assertFalse(
+            result.enough_evidence,
+            "G06: Related evidence is not sufficient to answer "
+            "the annual allowance question."
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
