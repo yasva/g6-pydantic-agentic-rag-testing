@@ -166,14 +166,14 @@ import asyncio
 import unittest
 
 from pydantic_ai import models
+from pydantic_ai.models.test import TestModel
 
 from agent import (
     RagDependencies,
     REFUSAL_TEXT,
     answer_question,
-    retrieve_evidence,
+    rag_agent,
 )
-
 from rag import HashingEmbeddingBackend, InMemoryVectorStore
 
 
@@ -246,12 +246,11 @@ class GoldenSetRefusalTests(unittest.TestCase):
             "G05: A refused answer should not contain citations."
         )
 
-        # The system must explain that evidence is insufficient.
+        # The refusal message should explain insufficient evidence.
         self.assertEqual(
             REFUSAL_TEXT,
             answer.text,
-            "G05: The refusal message should clearly explain "
-            "that evidence is insufficient."
+            "G05: Expected the standard insufficient-evidence message."
         )
 
     # ---------------------------------------------------------
@@ -262,34 +261,52 @@ class GoldenSetRefusalTests(unittest.TestCase):
         deps = self.make_deps()
         question = "What is the annual meal allowance?"
 
-        result = self.run_async(
-            retrieve_evidence(deps, question)
+        # The document provides only the daily allowance.
+        chunk = next(
+            chunk for chunk in deps.store.chunks
+            if chunk.source == "expenses.txt"
         )
 
-        # The related expenses document should be retrieved.
-        self.assertTrue(
-            any(
-                chunk.source == "expenses.txt"
-                for chunk in result.chunks
-            ),
-            "G06: Expected to retrieve the related expenses document."
+        # Simulate an unsupported annual answer with a real citation.
+        model = TestModel(
+            call_tools=["retrieve"],
+            custom_output_args={
+                "text": "The annual meal allowance is 70 dollars.",
+                "citations": [
+                    {
+                        "source": chunk.source,
+                        "chunk_id": chunk.chunk_id,
+                        "quoted_span": "The daily meal allowance is 70 dollars.",
+                    }
+                ],
+                "confidence": 0.95,
+                "answered": True,
+            },
         )
 
-        # The document provides a daily allowance, not an annual one.
-        self.assertTrue(
-            any(
-                "daily meal allowance is 70 dollars" in chunk.text.lower()
-                for chunk in result.chunks
-                if chunk.source == "expenses.txt"
-            ),
-            "G06: Expected evidence about the daily allowance."
-        )
+        # Prevent external AI model requests.
+        previous = models.ALLOW_MODEL_REQUESTS
+        models.ALLOW_MODEL_REQUESTS = False
 
-        # The retrieved information does not answer the annual question.
+        try:
+            with rag_agent.override(model=model):
+                answer = self.run_async(
+                    answer_question(question, deps)
+                )
+        finally:
+            models.ALLOW_MODEL_REQUESTS = previous
+
+        # The system should reject the unsupported annual amount.
         self.assertFalse(
-            result.enough_evidence,
-            "G06: Related evidence is not sufficient to answer "
-            "the annual allowance question."
+            answer.answered,
+            "G06: The system must refuse an unsupported annual allowance."
+        )
+
+        # A refused answer should not contain citations.
+        self.assertEqual(
+            [],
+            answer.citations,
+            "G06: A refused answer must not contain citations."
         )
 
 
