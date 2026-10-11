@@ -309,6 +309,60 @@ class GoldenSetRefusalTests(unittest.TestCase):
             "G06: A refused answer must not contain citations."
         )
 
+    # ---------------------------------------------------------
+    # G07: Parental leave amount is not provided
+    # ---------------------------------------------------------
+
+    def test_g07_refuses_unsupported_parental_leave_amount(self):
+        deps = self.make_deps()
+        question = "What is the parental leave benefit amount in dollars?"
+
+        # The document mentions paid leave but gives no dollar amount.
+        chunk = next(
+            chunk for chunk in deps.store.chunks
+            if chunk.source == "benefits.txt"
+        )
+
+        # Simulate an unsupported answer with a real citation.
+        model = TestModel(
+            call_tools=["retrieve"],
+            custom_output_args={
+                "text": "The parental leave benefit is 5000 dollars.",
+                "citations": [
+                    {
+                        "source": chunk.source,
+                        "chunk_id": chunk.chunk_id,
+                        "quoted_span": "twelve weeks of paid parental leave",
+                    }
+                ],
+                "confidence": 0.95,
+                "answered": True,
+            },
+        )
+
+        previous = models.ALLOW_MODEL_REQUESTS
+        models.ALLOW_MODEL_REQUESTS = False
+
+        try:
+            with rag_agent.override(model=model):
+                answer = self.run_async(
+                    answer_question(question, deps)
+                )
+        finally:
+            models.ALLOW_MODEL_REQUESTS = previous
+
+        # The system should reject the unsupported dollar amount.
+        self.assertFalse(
+            answer.answered,
+            "G07: The system must refuse an unsupported monetary amount."
+        )
+
+        self.assertEqual(
+            [],
+            answer.citations,
+            "G07: A refused answer must not contain citations."
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
