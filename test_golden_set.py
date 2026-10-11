@@ -236,3 +236,50 @@ class MetamorphicTests(unittest.TestCase):
             self.assertTrue(result.chunks)
             self.assertEqual("expenses.txt", result.chunks[0].source)
             self.assertIn("within thirty days", result.chunks[0].text)
+
+    def test_m04_meal_allowance_paraphrase(self):
+        """M04: Paraphrasing a monetary amount question preserves evidence."""
+
+        store = InMemoryVectorStore(HashingEmbeddingBackend(dimensions=512))
+
+        asyncio.run(
+            store.add_document(
+                "benefits.txt",
+                "Eligible employees receive twelve weeks of paid parental leave "
+                "after six months of employment.",
+            )
+        )
+
+        asyncio.run(
+            store.add_document(
+                "expenses.txt",
+                "Employees must submit expense reports within thirty days "
+                "after business travel. The daily meal allowance is 70 dollars.",
+            )
+        )
+
+        deps = RagDependencies(store=store, min_relevance=0.2, top_k=4)
+
+        original = asyncio.run(
+            retrieve_evidence(
+                deps,
+                "What is the daily meal allowance?",
+            )
+        )
+
+        paraphrase = asyncio.run(
+            retrieve_evidence(
+                deps,
+                "How much is the meal allowance per day?",
+            )
+        )
+
+        for result in (original, paraphrase):
+            self.assertTrue(result.enough_evidence)
+            self.assertTrue(result.chunks)
+            self.assertEqual("expenses.txt", result.chunks[0].source)
+            self.assertIn(
+                "The daily meal allowance is 70 dollars.",
+                result.chunks[0].text,
+            )
+            
