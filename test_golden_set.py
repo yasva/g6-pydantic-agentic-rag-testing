@@ -4,6 +4,7 @@ import unittest
 from agent import RagDependencies, retrieve_evidence
 from rag import HashingEmbeddingBackend, InMemoryVectorStore
 
+
 # Golden Set Retrieval Tests
 class GoldenSetRetrievalTests(unittest.TestCase):
     """Retrieval checks for the agreed shared test documents."""
@@ -99,13 +100,6 @@ class GoldenSetRetrievalTests(unittest.TestCase):
 #         environment, and results.
 # TODO 8: Compare baseline and extended results in the same environment.
 #         Record findings, blockers, limitations, and remaining work.
-
-import asyncio
-import unittest
-
-from agent import RagDependencies, retrieve_evidence
-from rag import HashingEmbeddingBackend, InMemoryVectorStore
-
 
 class MetamorphicTests(unittest.TestCase):
     def test_m01_paraphrase_invariance(self):
