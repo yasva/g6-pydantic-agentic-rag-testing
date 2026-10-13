@@ -233,6 +233,10 @@ class GoldenSetRetrievalTests(unittest.TestCase):
 
 
 
+
+from pydantic_ai import models
+from pydantic_ai.models.test import TestModel
+
 from agent import (
     RagDependencies,
     REFUSAL_TEXT,
