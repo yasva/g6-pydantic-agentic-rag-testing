@@ -1,8 +1,16 @@
 import asyncio
 import unittest
+from pydantic_ai import models
 
-from agent import RagDependencies, retrieve_evidence
+from agent import (
+    RagDependencies,
+    retrieve_evidence,
+    REFUSAL_TEXT,
+    answer_question,
+    rag_agent,
+)
 from rag import HashingEmbeddingBackend, InMemoryVectorStore
+from pydantic_ai.models.test import TestModel
 
 
 # Golden Set Retrieval Tests
@@ -61,45 +69,194 @@ class GoldenSetRetrievalTests(unittest.TestCase):
             )
         )
         self.assertFalse(result.enough_evidence)
+        
+        
+class GoldenSetRefusalTests(unittest.TestCase):
 
+    def run_async(self, awaitable):
+        return asyncio.run(awaitable)
 
-# SHARED TEST DOCUMENTS
-#
-# Use these same synthetic documents when proposing initial cases:
-#
-# benefits.txt:
-# "Eligible employees receive twelve weeks of paid parental leave after six
-# months of employment."
-#
-# expenses.txt:
-# "Employees must submit expense reports within thirty days after business
-# travel. The daily meal allowance is 70 dollars."
-#
-# If a proposed case needs additional or conflicting information, describe the
-# proposed change in the Word proposal sheet. The group must approve changes so
-# all final tests use the same agreed test documents.
+    def make_store(self):
+        return InMemoryVectorStore(
+            HashingEmbeddingBackend(dimensions=512)
+        )
 
+    def add_shared_documents(self, store):
+        self.run_async(
+            store.add_document(
+                "benefits.txt",
+                "Eligible employees receive twelve weeks of paid parental leave "
+                "after six months of employment."
+            )
+        )
 
+        self.run_async(
+            store.add_document(
+                "expenses.txt",
+                "Employees must submit expense reports within thirty days after "
+                "business travel. The daily meal allowance is 70 dollars."
+            )
+        )
 
-# WORK SEQUENCE
-#
-# TODO 1: Each member drafts 2–3 cases in their assigned risk area in the shared
-#         Word proposal sheet.
-# TODO 2: Review the expected evidence, answer/refusal decision, and pass
-#         condition together.
-# TODO 3: Remove duplicates and check that the cases cover all five planned
-#         risks: incorrect/irrelevant retrieval, unsupported answers,
-#         incorrect citations, answering without enough evidence, and
-#         inconsistent behaviour for equivalent questions.
-# TODO 4: Agree on and record the final cases and shared test documents.
-# TODO 5: Implement only the approved automated tests in THIS file:
-#         test_golden_set.py.
-# TODO 6: Follow the deterministic test patterns in test_typed_rag.py and avoid
-#         external API calls in automated tests where possible.
-# TODO 7: Run the new tests and then the complete suite. Save the command,
-#         environment, and results.
-# TODO 8: Compare baseline and extended results in the same environment.
-#         Record findings, blockers, limitations, and remaining work.
+    def make_deps(self):
+        store = self.make_store()
+        self.add_shared_documents(store)
+
+        return RagDependencies(
+            store=store,
+            min_relevance=0.2,
+            top_k=3,
+        )
+
+    # ---------------------------------------------------------
+    # G05: No relevant evidence exists
+    # ---------------------------------------------------------
+
+    def test_g05_refuses_unrelated_question(self):
+        deps = self.make_deps()
+        question = "Who won the 1978 World Cup?"
+
+        # Prevent external AI model requests.
+        previous = models.ALLOW_MODEL_REQUESTS
+        models.ALLOW_MODEL_REQUESTS = False
+
+        try:
+            answer = self.run_async(
+                answer_question(question, deps)
+            )
+        finally:
+            models.ALLOW_MODEL_REQUESTS = previous
+
+        # The system must refuse the unsupported question.
+        self.assertFalse(
+            answer.answered,
+            "G05: The system should refuse an unsupported question."
+        )
+
+        # A refused answer must not contain citations.
+        self.assertEqual(
+            [],
+            answer.citations,
+            "G05: A refused answer should not contain citations."
+        )
+
+        # The refusal message should explain insufficient evidence.
+        self.assertEqual(
+            REFUSAL_TEXT,
+            answer.text,
+            "G05: Expected the standard insufficient-evidence message."
+        )
+
+    # ---------------------------------------------------------
+    # G06: Related evidence exists but is not sufficient
+    # ---------------------------------------------------------
+
+    def test_g06_insufficient_annual_allowance_evidence(self):
+        deps = self.make_deps()
+        question = "What is the annual meal allowance?"
+
+        # The document provides only the daily allowance.
+        chunk = next(
+            chunk for chunk in deps.store.chunks
+            if chunk.source == "expenses.txt"
+        )
+
+        # Simulate an unsupported annual answer with a real citation.
+        model = TestModel(
+            call_tools=["retrieve"],
+            custom_output_args={
+                "text": "The annual meal allowance is 70 dollars.",
+                "citations": [
+                    {
+                        "source": chunk.source,
+                        "chunk_id": chunk.chunk_id,
+                        "quoted_span": "The daily meal allowance is 70 dollars.",
+                    }
+                ],
+                "confidence": 0.95,
+                "answered": True,
+            },
+        )
+
+        # Prevent external AI model requests.
+        previous = models.ALLOW_MODEL_REQUESTS
+        models.ALLOW_MODEL_REQUESTS = False
+
+        try:
+            with rag_agent.override(model=model):
+                answer = self.run_async(
+                    answer_question(question, deps)
+                )
+        finally:
+            models.ALLOW_MODEL_REQUESTS = previous
+
+        # The system should reject the unsupported annual amount.
+        self.assertFalse(
+            answer.answered,
+            "G06: The system must refuse an unsupported annual allowance."
+        )
+
+        # A refused answer should not contain citations.
+        self.assertEqual(
+            [],
+            answer.citations,
+            "G06: A refused answer must not contain citations."
+        )
+
+    # ---------------------------------------------------------
+    # G07: Parental leave amount is not provided
+    # ---------------------------------------------------------
+
+    def test_g07_refuses_unsupported_parental_leave_amount(self):
+        deps = self.make_deps()
+        question = "What is the parental leave benefit amount in dollars?"
+
+        # The document mentions paid leave but gives no dollar amount.
+        chunk = next(
+            chunk for chunk in deps.store.chunks
+            if chunk.source == "benefits.txt"
+        )
+
+        # Simulate an unsupported answer with a real citation.
+        model = TestModel(
+            call_tools=["retrieve"],
+            custom_output_args={
+                "text": "The parental leave benefit is 5000 dollars.",
+                "citations": [
+                    {
+                        "source": chunk.source,
+                        "chunk_id": chunk.chunk_id,
+                        "quoted_span": "twelve weeks of paid parental leave",
+                    }
+                ],
+                "confidence": 0.95,
+                "answered": True,
+            },
+        )
+
+        previous = models.ALLOW_MODEL_REQUESTS
+        models.ALLOW_MODEL_REQUESTS = False
+
+        try:
+            with rag_agent.override(model=model):
+                answer = self.run_async(
+                    answer_question(question, deps)
+                )
+        finally:
+            models.ALLOW_MODEL_REQUESTS = previous
+
+        # The system should reject the unsupported dollar amount.
+        self.assertFalse(
+            answer.answered,
+            "G07: The system must refuse an unsupported monetary amount."
+        )
+
+        self.assertEqual(
+            [],
+            answer.citations,
+            "G07: A refused answer must not contain citations."
+        )
+
 
 class MetamorphicTests(unittest.TestCase):
     def test_m01_paraphrase_invariance(self):
@@ -229,4 +386,46 @@ class MetamorphicTests(unittest.TestCase):
                 "The daily meal allowance is 70 dollars.",
                 result.chunks[0].text,
             )
-            
+
+
+
+# SHARED TEST DOCUMENTS
+#
+# Use these same synthetic documents when proposing initial cases:
+#
+# benefits.txt:
+# "Eligible employees receive twelve weeks of paid parental leave after six
+# months of employment."
+#
+# expenses.txt:
+# "Employees must submit expense reports within thirty days after business
+# travel. The daily meal allowance is 70 dollars."
+#
+# If a proposed case needs additional or conflicting information, describe the
+# proposed change in the Word proposal sheet. The group must approve changes so
+# all final tests use the same agreed test documents.
+
+
+
+# WORK SEQUENCE
+#
+# TODO 1: Each member drafts 2–3 cases in their assigned risk area in the shared
+#         Word proposal sheet.
+# TODO 2: Review the expected evidence, answer/refusal decision, and pass
+#         condition together.
+# TODO 3: Remove duplicates and check that the cases cover all five planned
+#         risks: incorrect/irrelevant retrieval, unsupported answers,
+#         incorrect citations, answering without enough evidence, and
+#         inconsistent behaviour for equivalent questions.
+# TODO 4: Agree on and record the final cases and shared test documents.
+# TODO 5: Implement only the approved automated tests in THIS file:
+#         test_golden_set.py.
+# TODO 6: Follow the deterministic test patterns in test_typed_rag.py and avoid
+#         external API calls in automated tests where possible.
+# TODO 7: Run the new tests and then the complete suite. Save the command,
+#         environment, and results.
+# TODO 8: Compare baseline and extended results in the same environment.
+#         Record findings, blockers, limitations, and remaining work.
+
+if __name__ == "__main__":
+    unittest.main()
