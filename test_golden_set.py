@@ -4,6 +4,7 @@ import unittest
 from agent import RagDependencies, retrieve_evidence
 from rag import HashingEmbeddingBackend, InMemoryVectorStore
 
+
 # Golden Set Retrieval Tests
 class GoldenSetRetrievalTests(unittest.TestCase):
     """Retrieval checks for the agreed shared test documents."""
@@ -99,3 +100,133 @@ class GoldenSetRetrievalTests(unittest.TestCase):
 #         environment, and results.
 # TODO 8: Compare baseline and extended results in the same environment.
 #         Record findings, blockers, limitations, and remaining work.
+
+class MetamorphicTests(unittest.TestCase):
+    def test_m01_paraphrase_invariance(self):
+        store = InMemoryVectorStore(HashingEmbeddingBackend(dimensions=512))
+
+        asyncio.run(
+            store.add_document(
+                "benefits.txt",
+                "Eligible employees receive twelve weeks of paid parental leave "
+                "after six months of employment.",
+            )
+        )
+
+        asyncio.run(
+            store.add_document(
+                "expenses.txt",
+                "Employees must submit expense reports within thirty days "
+                "after business travel. The daily meal allowance is 70 dollars.",
+            )
+        )
+
+        deps = RagDependencies(store=store, min_relevance=0.2, top_k=4)
+
+        original = asyncio.run(
+            retrieve_evidence(
+                deps,
+                "How many weeks of paid parental leave do eligible employees receive?",
+            )
+        )
+
+        paraphrase = asyncio.run(
+            retrieve_evidence(
+                deps,
+                "What is the duration of paid parental leave for eligible employees?",
+            )
+        )
+
+        for result in (original, paraphrase):
+            self.assertTrue(result.enough_evidence)
+            self.assertTrue(result.chunks)
+            self.assertEqual("benefits.txt", result.chunks[0].source)
+            self.assertIn("twelve weeks of paid parental leave", result.chunks[0].text)
+
+    def test_m02_expense_report_paraphrase(self):
+        store = InMemoryVectorStore(HashingEmbeddingBackend(dimensions=512))
+
+        asyncio.run(
+            store.add_document(
+                "benefits.txt",
+                "Eligible employees receive twelve weeks of paid parental leave "
+                "after six months of employment.",
+            )
+        )
+
+        asyncio.run(
+            store.add_document(
+                "expenses.txt",
+                "Employees must submit expense reports within thirty days "
+                "after business travel. The daily meal allowance is 70 dollars.",
+            )
+        )
+
+        deps = RagDependencies(store=store, min_relevance=0.2, top_k=4)
+
+        original = asyncio.run(
+            retrieve_evidence(
+                deps,
+                "When must employees submit expense reports after business travel?",
+            )
+        )
+
+        paraphrase = asyncio.run(
+            retrieve_evidence(
+                deps,
+                "How soon after business travel are expense reports due?",
+            )
+        )
+
+        for result in (original, paraphrase):
+            self.assertTrue(result.enough_evidence)
+            self.assertTrue(result.chunks)
+            self.assertEqual("expenses.txt", result.chunks[0].source)
+            self.assertIn("within thirty days", result.chunks[0].text)
+
+    def test_m04_meal_allowance_paraphrase(self):
+        """M04: Paraphrasing a monetary amount question preserves evidence."""
+
+        store = InMemoryVectorStore(HashingEmbeddingBackend(dimensions=512))
+
+        asyncio.run(
+            store.add_document(
+                "benefits.txt",
+                "Eligible employees receive twelve weeks of paid parental leave "
+                "after six months of employment.",
+            )
+        )
+
+        asyncio.run(
+            store.add_document(
+                "expenses.txt",
+                "Employees must submit expense reports within thirty days "
+                "after business travel. The daily meal allowance is 70 dollars.",
+            )
+        )
+
+        deps = RagDependencies(store=store, min_relevance=0.2, top_k=4)
+
+        original = asyncio.run(
+            retrieve_evidence(
+                deps,
+                "What is the daily meal allowance?",
+            )
+        )
+
+        paraphrase = asyncio.run(
+            retrieve_evidence(
+                deps,
+                "How much is the meal allowance per day?",
+            )
+        )
+
+        for result in (original, paraphrase):
+            self.assertTrue(result.enough_evidence)
+            self.assertTrue(result.chunks)
+            self.assertEqual("expenses.txt", result.chunks[0].source)
+            self.assertIn(
+                "The daily meal allowance is 70 dollars.",
+                result.chunks[0].text,
+            )
+            

@@ -9,41 +9,41 @@
 
 ## 1. Identification
 
-| Field | Value |
-|---|---|
-| Date | 2026-10-11 |
-| Exact time / timezone | 09:15 (Swedish local time, CEST / UTC+02:00) |
-| Tested by | Yasaman Vallaee |
-| Risk area / technique | Retrieval relevance; independent reproduction of Golden Set tests |
-| Test case IDs | G02, G03 (Christian's current test IDs) |
-| Test file | `test_golden_set.py` |
-| Test methods | `test_g02_retrieves_expense_report_deadline`; `test_g03_rejects_leave_amount_without_monetary_evidence` |
-| Local branch | `review-christian` |
-| Tracking branch | `origin/retrieval-relevance-golden-set-tests` |
-| Commit hash | `43a61496a0e2ca50b6b43103a891aa8a4b57fbca` (verified with `git rev-parse HEAD`) |
-| Suite | Extended suite (original tests + Christian's two retrieval tests) |
-| Baseline reference | `baseline` tag, commit `b354c12` |
+| Field                 | Value                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------- |
+| Date                  | 2026-10-11                                                                                              |
+| Exact time / timezone | 09:15 (Swedish local time, CEST / UTC+02:00)                                                            |
+| Tested by             | Yasaman Vallaee                                                                                         |
+| Risk area / technique | Retrieval relevance; independent reproduction of Golden Set tests                                       |
+| Test case IDs         | G02, G03 (Christian's current test IDs)                                                                 |
+| Test file             | `test_golden_set.py`                                                                                    |
+| Test methods          | `test_g02_retrieves_expense_report_deadline`; `test_g03_rejects_leave_amount_without_monetary_evidence` |
+| Local branch          | `review-christian`                                                                                      |
+| Tracking branch       | `origin/retrieval-relevance-golden-set-tests`                                                           |
+| Commit hash           | `43a61496a0e2ca50b6b43103a891aa8a4b57fbca` (verified with `git rev-parse HEAD`)                         |
+| Suite                 | Extended suite (original tests + Christian's two retrieval tests)                                       |
+| Baseline reference    | `baseline` tag, commit `b354c12`                                                                        |
 
 ## 2. Environment and configuration
 
-| Field | Value |
-|---|---|
-| Host operating system | Windows, version/build `10.0.26200.9457` (from `wsl --version`) |
-| Guest/test operating system | Ubuntu 24.04.4 LTS (Noble Numbat), running under Windows Subsystem for Linux (WSL) |
-| WSL version | `2.7.3.0` (WSL architecture generation not separately verified) |
-| WSL Linux kernel | `6.6.114.1-1` |
-| Python | 3.12.3 |
-| pytest | 9.1.1 |
-| Virtual environment | Project `.venv` activated |
-| Python executable | `/home/yasam/miun/DV033G-testing/project/g6-pydantic-agentic-rag-testing/.venv/bin/python3` |
-| Embedding backend | `HashingEmbeddingBackend` (from test implementation) |
-| Embedding dimensions | 512 (from test implementation) |
-| `min_relevance` | 0.20 (from test implementation) |
-| `top_k` | 4 (from test implementation) |
-| Model used by G02/G03 | None; retrieval-only tests |
-| External API calls by G02/G03 | None; local in-memory store and hashing backend |
-| External API calls by entire suite | Not independently network-monitored; original tests use simulated model behaviour |
-| Additional package versions | `pluggy 1.6.0`, `pytest-cov 7.1.0` (as displayed in pytest plugin output) |
+| Field                              | Value                                                                                       |
+| ---------------------------------- | ------------------------------------------------------------------------------------------- |
+| Host operating system              | Windows, version/build `10.0.26200.9457` (from `wsl --version`)                             |
+| Guest/test operating system        | Ubuntu 24.04.4 LTS (Noble Numbat), running under Windows Subsystem for Linux (WSL)          |
+| WSL version                        | `2.7.3.0` (WSL architecture generation not separately verified)                             |
+| WSL Linux kernel                   | `6.6.114.1-1`                                                                               |
+| Python                             | 3.12.3                                                                                      |
+| pytest                             | 9.1.1                                                                                       |
+| Virtual environment                | Project `.venv` activated                                                                   |
+| Python executable                  | `/home/yasam/miun/DV033G-testing/project/g6-pydantic-agentic-rag-testing/.venv/bin/python3` |
+| Embedding backend                  | `HashingEmbeddingBackend` (from test implementation)                                        |
+| Embedding dimensions               | 512 (from test implementation)                                                              |
+| `min_relevance`                    | 0.20 (from test implementation)                                                             |
+| `top_k`                            | 4 (from test implementation)                                                                |
+| Model used by G02/G03              | None; retrieval-only tests                                                                  |
+| External API calls by G02/G03      | None; local in-memory store and hashing backend                                             |
+| External API calls by entire suite | Not independently network-monitored; original tests use simulated model behaviour           |
+| Additional package versions        | `pluggy 1.6.0`, `pytest-cov 7.1.0` (as displayed in pytest plugin output)                   |
 
 ## 3. Test setup and oracle
 
@@ -52,9 +52,11 @@
 These are added in memory by `add_shared_documents()`; physical `.txt` files are not required for these tests.
 
 `benefits.txt`:
+
 > Eligible employees receive twelve weeks of paid parental leave after six months of employment.
 
 `expenses.txt`:
+
 > Employees must submit expense reports within thirty days after business travel. The daily meal allowance is 70 dollars.
 
 ### G02 — Expense report deadline
@@ -70,7 +72,7 @@ These are added in memory by `add_shared_documents()`; physical `.txt` files are
 
 - **Input:** `What is the parental leave benefit amount in dollars?`
 - **Expected behaviour in the implemented test:** Retrieval marks evidence as insufficient (`enough_evidence=False`).
-- **Reason:** The shared documents state the *duration* of parental leave but do not specify a monetary parental leave benefit.
+- **Reason:** The shared documents state the _duration_ of parental leave but do not specify a monetary parental leave benefit.
 - **Pass condition in the implemented test:** `assertFalse(result.enough_evidence)`.
 - **Scope:** Retrieval gate only; this does not demonstrate whether the final agent would answer or refuse.
 
@@ -86,10 +88,10 @@ python3 -m pytest test_golden_set.py -v
 
 **Observed:** 2 tests collected; **1 passed, 1 failed**; 3.34 seconds.
 
-| Test | Observed status | Evidence |
-|---|---|---|
-| G02 | PASS | `test_g02_retrieves_expense_report_deadline PASSED` |
-| G03 | FAIL | `AssertionError: True is not false` at `test_golden_set.py:62` |
+| Test | Observed status | Evidence                                                       |
+| ---- | --------------- | -------------------------------------------------------------- |
+| G02  | PASS            | `test_g02_retrieves_expense_report_deadline PASSED`            |
+| G03  | FAIL            | `AssertionError: True is not false` at `test_golden_set.py:62` |
 
 ### Run B — Full original and extended test suite
 
@@ -141,15 +143,30 @@ A separate measurement is required to document the exact similarity score and to
 
 ## 6. Follow-up
 
-| Field | Value |
-|---|---|
-| Action required | Agree on oracle; classify G03; decide how to preserve/report the known failing test; align case IDs with shared sheet |
-| Test owner | Christian |
-| Independent reviewer | Yasaman |
-| Related branch | `retrieval-relevance-golden-set-tests` |
-| PR number / URL | https://github.com/yasva/g6-pydantic-agentic-rag-testing/pull/2 |
-| Review status | Open — no merge or approval recorded |
-| Group review date | Pending |
+| Field                | Value                                                                                                                 |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Action required      | Agree on oracle; classify G03; decide how to preserve/report the known failing test; align case IDs with shared sheet |
+| Test owner           | Christian                                                                                                             |
+| Independent reviewer | Yasaman                                                                                                               |
+| Related branch       | `retrieval-relevance-golden-set-tests`                                                                                |
+| PR number / URL      | https://github.com/yasva/g6-pydantic-agentic-rag-testing/pull/2                                                       |
+| Review status        | Reviewed on 2026-10-11; subsequently merged into `main` (confirmed locally on 2026-10-12)                             |
+| Group review date    | Pending                                                                                                               |
+
+### Follow-up — 2026-10-12
+
+Christian's G02 and G03 tests were subsequently merged into `main` and incorporated into the `metamorphic-testing-yasaman` branch.
+
+The combined test suite was executed again:
+
+- 16 tests collected
+- 14 passed
+- 2 failed
+- 5 subtests passed
+
+G02 remained PASS and G03 remained FAIL.
+
+The G03 finding remains unclassified pending group review. No SUT changes were made.
 
 ### Verification still needed
 
