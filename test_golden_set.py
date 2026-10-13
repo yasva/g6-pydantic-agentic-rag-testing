@@ -36,6 +36,28 @@ class GoldenSetRetrievalTests(unittest.TestCase):
                 "business travel. The daily meal allowance is 70 dollars.",
             )
         )
+
+    def test_g01_retrieves_parental_leave_duration(self):
+            """G01: retrieve sufficient evidence for the parental leave question."""
+            store = self.make_store()
+            self.add_shared_documents(store)
+            deps = RagDependencies(store=store, min_relevance=0.2, top_k=4)
+    
+            result = self.run_async(
+                retrieve_evidence(
+                    deps,
+                    "How many weeks of paid parental leave do eligible employees receive?",
+                )
+            )
+            self.assertTrue(result.enough_evidence)
+            self.assertEqual("benefits.txt", result.chunks[0].source)
+            self.assertTrue(
+                any(
+                    "twelve weeks of paid parental leave" in chunk.text.lower()
+                    for chunk in result.chunks
+                )
+            )
+    
     def test_g02_retrieves_expense_report_deadline(self):
         """G02: retrieve sufficient evidence for the expense-report question."""
         store = self.make_store()
@@ -387,6 +409,73 @@ class MetamorphicTests(unittest.TestCase):
                 result.chunks[0].text,
             )
 
+
+from agent import rag_agent, Answer, answer_question
+class GoldenSetFalseCitation(unittest.TestCase):
+    def run_async(self, awaitable):
+        return asyncio.run(awaitable)
+
+    def make_store(self):
+        return InMemoryVectorStore(HashingEmbeddingBackend(dimensions=512))
+
+    def test_G04_not_answered_when_incorrect_source(self):
+        from pydantic_ai import models
+        from pydantic_ai.models.test import TestModel
+
+        store = self.make_store()
+        # Create both documents
+        self.run_async(
+            store.add_document(
+                "expenses.txt",
+                "Employees must submit expense reports within thirty days after business travel. The daily meal allowance is 70 dollars.",
+            )
+        )
+        self.run_async(
+            store.add_document(
+                "benefits.txt",
+                "Eligible employees receive twelve weeks of paid parental leave after six months of employment.",
+            )
+        )
+
+        benefits_chunk = next(chunk for chunk in store.chunks if chunk.source == "benefits.txt")
+
+        deps = RagDependencies(store=store, min_relevance=0.2, top_k=3)
+
+        # Construct an answer with the wrong source
+        model = TestModel(
+            call_tools=["retrieve"],
+            custom_output_args={
+                "text": "The daily meal allowance is 70 dollars",
+                "citations": [
+                    {
+                        "source": benefits_chunk.source,
+                        "chunk_id": benefits_chunk.chunk_id,
+                        "quoted_span": "daily meal allowance is 70 dollars",
+                    }
+                ],
+                "confidence": 0.95,
+                "answered": True,
+            },
+        )
+        # Prevent model from requesting outside models
+        previous = models.ALLOW_MODEL_REQUESTS
+        models.ALLOW_MODEL_REQUESTS = False
+        try:
+            with rag_agent.override(model=model):
+                answer = self.run_async(
+                    answer_question("What is the daily meal allowance?", deps)
+                )
+        finally:
+            models.ALLOW_MODEL_REQUESTS = previous
+
+        # Answer is instance of answer
+        self.assertIsInstance(answer, Answer)
+
+        # Question is not answered
+        self.assertFalse(answer.answered)
+
+        # Citations is empty
+        self.assertEqual([], answer.citations)
 
 
 # SHARED TEST DOCUMENTS
