@@ -1,0 +1,18 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0
+rootdir: /home/yasam/miun/DV033G-testing/project/g6-pydantic-agentic-rag-testing
+plugins: logfire-5.1.1, anyio-4.15.1, platformdirs-4.12.3, cov-7.1.0
+collected 11 items
+
+test_typed_rag.py ...........                                            [100%]
+
+================================ tests coverage ================================
+_______________ coverage: platform linux, python 3.12.3-final-0 ________________
+
+Name       Stmts   Miss Branch BrPart  Cover
+--------------------------------------------
+agent.py     115     13     30      8    86%
+rag.py       232     53     72     19    74%
+--------------------------------------------
+TOTAL        347     66    102     27    78%
+============================= 11 passed in 12.20s ==============================

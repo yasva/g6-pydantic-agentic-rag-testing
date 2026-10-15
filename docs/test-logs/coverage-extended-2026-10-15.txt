@@ -1,0 +1,192 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0
+rootdir: /home/yasam/miun/DV033G-testing/project/g6-pydantic-agentic-rag-testing
+plugins: logfire-5.1.1, anyio-4.15.1, platformdirs-4.12.3, cov-7.1.0
+collected 21 items
+
+test_typed_rag.py ...........                                            [ 52%]
+test_golden_set.py ..F.FF..F.                                            [100%]
+
+=================================== FAILURES ===================================
+_ GoldenSetRetrievalTests.test_g03_rejects_leave_amount_without_monetary_evidence _
+
+self = <test_golden_set.GoldenSetRetrievalTests testMethod=test_g03_rejects_leave_amount_without_monetary_evidence>
+
+    def test_g03_rejects_leave_amount_without_monetary_evidence(self):
+        """G03: a leave duration must not count as evidence of a dollar amount."""
+        store = self.make_store()
+        self.add_shared_documents(store)
+        deps = RagDependencies(store=store, min_relevance=0.2, top_k=4)
+
+        result = self.run_async(
+            retrieve_evidence(
+                deps,
+                "What is the parental leave benefit amount in dollars?",
+            )
+        )
+>       self.assertFalse(result.enough_evidence)
+E       AssertionError: True is not false
+
+test_golden_set.py:93: AssertionError
+____ GoldenSetRefusalTests.test_g06_insufficient_annual_allowance_evidence _____
+
+self = <test_golden_set.GoldenSetRefusalTests testMethod=test_g06_insufficient_annual_allowance_evidence>
+
+    def test_g06_insufficient_annual_allowance_evidence(self):
+        deps = self.make_deps()
+        question = "What is the annual meal allowance?"
+
+        # The document provides only the daily allowance.
+        chunk = next(
+            chunk for chunk in deps.store.chunks
+            if chunk.source == "expenses.txt"
+        )
+
+        # Simulate an unsupported annual answer with a real citation.
+        model = TestModel(
+            call_tools=["retrieve"],
+            custom_output_args={
+                "text": "The annual meal allowance is 70 dollars.",
+                "citations": [
+                    {
+                        "source": chunk.source,
+                        "chunk_id": chunk.chunk_id,
+                        "quoted_span": "The daily meal allowance is 70 dollars.",
+                    }
+                ],
+                "confidence": 0.95,
+                "answered": True,
+            },
+        )
+
+        # Prevent external AI model requests.
+        previous = models.ALLOW_MODEL_REQUESTS
+        models.ALLOW_MODEL_REQUESTS = False
+
+        try:
+            with rag_agent.override(model=model):
+                answer = self.run_async(
+                    answer_question(question, deps)
+                )
+        finally:
+            models.ALLOW_MODEL_REQUESTS = previous
+
+        # The system should reject the unsupported annual amount.
+>       self.assertFalse(
+            answer.answered,
+            "G06: The system must refuse an unsupported annual allowance."
+        )
+E       AssertionError: True is not false : G06: The system must refuse an unsupported annual allowance.
+
+test_golden_set.py:216: AssertionError
+___ GoldenSetRefusalTests.test_g07_refuses_unsupported_parental_leave_amount ___
+
+self = <test_golden_set.GoldenSetRefusalTests testMethod=test_g07_refuses_unsupported_parental_leave_amount>
+
+    def test_g07_refuses_unsupported_parental_leave_amount(self):
+        deps = self.make_deps()
+        question = "What is the parental leave benefit amount in dollars?"
+
+        # The document mentions paid leave but gives no dollar amount.
+        chunk = next(
+            chunk for chunk in deps.store.chunks
+            if chunk.source == "benefits.txt"
+        )
+
+        # Simulate an unsupported answer with a real citation.
+        model = TestModel(
+            call_tools=["retrieve"],
+            custom_output_args={
+                "text": "The parental leave benefit is 5000 dollars.",
+                "citations": [
+                    {
+                        "source": chunk.source,
+                        "chunk_id": chunk.chunk_id,
+                        "quoted_span": "twelve weeks of paid parental leave",
+                    }
+                ],
+                "confidence": 0.95,
+                "answered": True,
+            },
+        )
+
+        previous = models.ALLOW_MODEL_REQUESTS
+        models.ALLOW_MODEL_REQUESTS = False
+
+        try:
+            with rag_agent.override(model=model):
+                answer = self.run_async(
+                    answer_question(question, deps)
+                )
+        finally:
+            models.ALLOW_MODEL_REQUESTS = previous
+
+        # The system should reject the unsupported dollar amount.
+>       self.assertFalse(
+            answer.answered,
+            "G07: The system must refuse an unsupported monetary amount."
+        )
+E       AssertionError: True is not false : G07: The system must refuse an unsupported monetary amount.
+
+test_golden_set.py:271: AssertionError
+_____________ MetamorphicTests.test_m04_meal_allowance_paraphrase ______________
+
+self = <test_golden_set.MetamorphicTests testMethod=test_m04_meal_allowance_paraphrase>
+
+    def test_m04_meal_allowance_paraphrase(self):
+        """M04: Paraphrasing a monetary amount question preserves evidence."""
+
+        store = InMemoryVectorStore(HashingEmbeddingBackend(dimensions=512))
+
+        asyncio.run(
+            store.add_document(
+                "benefits.txt",
+                "Eligible employees receive twelve weeks of paid parental leave "
+                "after six months of employment.",
+            )
+        )
+
+        asyncio.run(
+            store.add_document(
+                "expenses.txt",
+                "Employees must submit expense reports within thirty days "
+                "after business travel. The daily meal allowance is 70 dollars.",
+            )
+        )
+
+        deps = RagDependencies(store=store, min_relevance=0.2, top_k=4)
+
+        original = asyncio.run(
+            retrieve_evidence(
+                deps,
+                "What is the daily meal allowance?",
+            )
+        )
+
+        paraphrase = asyncio.run(
+            retrieve_evidence(
+                deps,
+                "How much is the meal allowance per day?",
+            )
+        )
+
+        for result in (original, paraphrase):
+>           self.assertTrue(result.enough_evidence)
+E           AssertionError: False is not true
+
+test_golden_set.py:404: AssertionError
+================================ tests coverage ================================
+_______________ coverage: platform linux, python 3.12.3-final-0 ________________
+
+Name       Stmts   Miss Branch BrPart  Cover
+--------------------------------------------
+agent.py     115     13     30      8    86%
+rag.py       232     53     72     18    74%
+--------------------------------------------
+TOTAL        347     66    102     26    78%
+=========================== short test summary info ============================
+FAILED test_golden_set.py::GoldenSetRetrievalTests::test_g03_rejects_leave_amount_without_monetary_evidence
+FAILED test_golden_set.py::GoldenSetRefusalTests::test_g06_insufficient_annual_allowance_evidence
+FAILED test_golden_set.py::GoldenSetRefusalTests::test_g07_refuses_unsupported_parental_leave_amount
+FAILED test_golden_set.py::MetamorphicTests::test_m04_meal_allowance_paraphrase
+======================== 4 failed, 17 passed in 11.24s =========================
