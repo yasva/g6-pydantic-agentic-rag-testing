@@ -59,6 +59,7 @@ Install the application dependencies and the testing tools used in the documente
 ```bash
 python -m pip install -r requirements.txt
 python -m pip install pytest==9.1.1 pytest-cov==7.1.0
+python -m pip install ruff==0.17.0
 ```
 
 ### Configuration
@@ -81,6 +82,16 @@ Run the original and extended tests together, including coverage measurement:
 python -m pytest test_typed_rag.py test_golden_set.py --cov=agent --cov=rag --cov-branch --cov-report=term
 ```
 
+### Static Analysis
+
+Ruff can be used to check the Python source code for potential issues without running the tests.
+
+Run Ruff with:
+
+```bash
+python -m ruff check agent.py rag.py
+```
+
 ### Documented Test Results
 
 The combined test execution on 15 October 2026 produced:
@@ -88,6 +99,7 @@ The combined test execution on 15 October 2026 produced:
 - 21 collected tests
 - 17 passed
 - 4 failed: G03, G06, G07, and M04
+- Approximately 81% statement coverage
 - 78% combined statement/branch coverage
 
 The four failures represent documented findings in the extended test suite. They should not be interpreted as installation failures.
