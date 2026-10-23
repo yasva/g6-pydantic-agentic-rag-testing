@@ -5,23 +5,23 @@
 **Repository:** `g6-pydantic-agentic-rag-testing`  
 **Reviewer:** Marjan Motafeghi  
 **Test owner:** Yasaman  
-**Purpose:** Independently reproduce and review Yasaman's metamorphic testing results without modifying the system under test.
+**Purpose:** Independently reproduce and review Yasaman's metamorphic tests without changing the system under test (SUT).
 
 ## Group-wide test setup
 
 | Field | Value |
 |---|---|
-| Approved test oracle / reference | Not yet approved by the group |
-| Oracle decision date / location | Pending group decision |
-| Approved Golden Set case IDs | Pending group approval |
-| Approved shared documents / versions | Synthetic `benefits.txt` and `expenses.txt` used in the tests; formal group approval pending |
+| Test oracle / reference | Golden Set ground-truth facts and metamorphic paraphrase-consistency relation, documented in final report Section 3 |
+| Oracle reference | Final report, Section 3 |
+| Golden Set case IDs | Final report lists G01–G07 and M01, M02, M04 |
+| Shared documents / versions | Synthetic `benefits.txt` and `expenses.txt`, as described in final report Section 3 |
 | Embedding backend | `HashingEmbeddingBackend` |
 | Embedding dimensions | 512 |
 | `min_relevance` | 0.2 |
 | `top_k` | 4 |
-| Real LLM / offline testing decision | Reviewed tests run offline without an LLM; group-wide decision not confirmed |
+| Real LLM / offline testing decision | Final report Section 1 documents the group decision to use offline, controlled tests without a live LLM |
 | Baseline tag / commit | `baseline` / `b354c12` |
-| Additional pass/fail thresholds | No additional group-approved thresholds confirmed |
+| Additional pass/fail thresholds | M04 uses `min_relevance=0.2` and the test assertions below; no other threshold documented |
 
 ---
 
@@ -39,7 +39,7 @@
 | Test methods / file | `MetamorphicTests` in `test_golden_set.py` |
 | Branch | `metamorphic-testing-yasaman` |
 | Commit hash | `3ab25e636088ce8beacd9909853e11b7ee95f938` |
-| Suite | Extended suite; full-suite regression also executed |
+| Suite | Extended tests and full-suite regression |
 
 ### 2. Environment and configuration
 
@@ -48,13 +48,11 @@
 | Operating system | macOS |
 | Python version | 3.12.6 |
 | Test framework | `unittest` |
-| pytest version | Not used for this independent execution |
+| pytest version | Not used in this review |
 | Virtual environment | `.venv` |
-| Embedding backend | `HashingEmbeddingBackend` |
-| Embedding dimensions | 512 |
-| `min_relevance` | 0.2 |
-| `top_k` | 4 |
-| Model / TestModel / FunctionModel / none | None for the reviewed retrieval tests |
+| Embedding backend | `HashingEmbeddingBackend` (512 dimensions) |
+| `min_relevance` / `top_k` | 0.2 / 4 |
+| Model / TestModel / FunctionModel / none | None; retrieval-only tests |
 | External API calls | No |
 | Relevant dependency versions | Not separately recorded |
 
@@ -62,15 +60,10 @@
 
 **Shared test documents / synthetic data**
 
-The reviewed tests use an in-memory vector store containing synthetic documents. The following content was independently used to reproduce the M04 result:
+The tests use an in-memory vector store with two synthetic documents:
 
-`benefits.txt`:
-
-> Eligible employees receive twelve weeks of paid parental leave after six months of employment.
-
-`expenses.txt`:
-
-> Employees must submit expense reports within thirty days after business travel. The daily meal allowance is 70 dollars.
+- `benefits.txt`: “Eligible employees receive twelve weeks of paid parental leave after six months of employment.”
+- `expenses.txt`: “Employees must submit expense reports within thirty days after business travel. The daily meal allowance is 70 dollars.”
 
 **Original question / input — M04**
 
@@ -82,61 +75,36 @@ The reviewed tests use an in-memory vector store containing synthetic documents.
 
 **Expected behaviour**
 
-Yasaman's metamorphic tests check whether questions with the same meaning produce consistent retrieval results.
-
-For M04, the test expects both questions to return `enough_evidence=True`.
+Yasaman's metamorphic tests expect semantically equivalent questions to produce consistent retrieval results. In M04, both should return `enough_evidence=True`.
 
 **Expected source and evidence**
 
-Both questions should retrieve the relevant evidence from `expenses.txt`, including the statement that the daily meal allowance is 70 dollars.
+Both questions should retrieve `expenses.txt`, including the daily meal allowance of 70 dollars.
 
 **Test oracle**
 
-The test expectations are defined in Yasaman's test code and are based on the proposed metamorphic relation of paraphrase consistency.
+The oracle comes from the implemented test assertions and the paraphrase-consistency relation described in final report Section 3. The synthetic documents provide known facts. The report treats failures as findings rather than confirmed defects.
 
-However, the group has not yet formally approved the final test oracle, Golden Set cases, or defect-classification criteria.
-
-The current expectations are therefore used to reproduce the tests, **not as a group-approved reference for confirming software defects**.
-
-**Oracle status:** Pending group review and approval.
+**Oracle status:** Defined and documented in the final report.
 
 **Measurable pass conditions**
 
-According to the existing M04 test assertions:
-
-- Both questions must return `enough_evidence=True`.
-- The expected relevant evidence must be retrieved.
-- The paraphrased question must satisfy the same tested conditions as the original question.
+- Both questions return `enough_evidence=True`.
+- Relevant evidence is retrieved.
+- The paraphrased question meets the same tested conditions as the original.
 
 **Scope of assertion**
 
-Retrieval behaviour only. The tests do not evaluate generated answers from a real LLM.
+Retrieval only; no real-LLM answer generation or answer correctness is tested.
 
 ### 4. Execution and actual results
 
 **Exact commands**
 
-Run Yasaman's tests:
-
 ```bash
 python -m unittest test_golden_set.MetamorphicTests -v
-```
-
-Run the full test suite:
-
-```bash
 python -m unittest discover -v
-```
-
-Inspect the retrieval decision:
-
-```bash
 grep -n -A 45 '^async def retrieve_evidence' agent.py
-```
-
-Verify repository status:
-
-```bash
 git status
 ```
 
@@ -145,7 +113,7 @@ git status
 | Execution | Passed | Failed | Total |
 |---|---:|---:|---:|
 | Yasaman's metamorphic tests | 2 | 1 | 3 |
-| Full test suite | 14 | 2 | 16 |
+| Full test suite (at this recorded commit; historical run, not the final combined suite) | 14 | 2 | 16 |
 
 **Individual metamorphic test results**
 
@@ -155,7 +123,7 @@ git status
 | M02 — Expense report paraphrase | PASS |
 | M04 — Meal allowance paraphrase | FAIL |
 
-The full suite also reported a failure in Christian's G03 test. That failure is separate from Yasaman's M04 test.
+The full-suite run also failed Christian's G03 test, separately from M04. The final report presents a later combined result of 17 passed and 4 failed across 21 tests; these are different execution snapshots and should not be conflated.
 
 **Observed M04 results**
 
@@ -166,7 +134,7 @@ The full suite also reported a failure in Christian's G03 test. That failure is 
 | Relevant source retrieved | `expenses.txt` | `expenses.txt` |
 | `enough_evidence` | True | False |
 
-Both questions retrieved the same relevant text from `expenses.txt`. However, the second question returned `enough_evidence=False`.
+Both questions retrieved the same relevant source, but the paraphrase fell below the threshold.
 
 **Failure excerpt**
 
@@ -174,61 +142,47 @@ Both questions retrieved the same relevant text from `expenses.txt`. However, th
 AssertionError: False is not true
 ```
 
-The failure occurred in `test_golden_set.py`, line 225, at the assertion checking `result.enough_evidence`.
+The assertion failed in `test_golden_set.py`, line 225, when checking `result.enough_evidence`.
 
 **Status:** FAIL — M04 independently reproduced.
 
 **Evidence location**
 
-Terminal output from the independent `unittest` runs and diagnostic commands. No separate evidence-log file was created during this review.
+Terminal output from the independent `unittest` runs and diagnostic commands; no separate evidence-log file was created during that review.
 
 **Independent reproduction**
 
-Marjan independently reproduced Yasaman's reported M04 failure on macOS using commit `3ab25e636088ce8beacd9909853e11b7ee95f938`.
+Marjan reproduced M04 on macOS at commit `3ab25e636088ce8beacd9909853e11b7ee95f938`.
 
 ### 5. Findings and interpretation
 
 **Expected vs actual difference**
 
-M04 expects both paraphrased questions to return `enough_evidence=True`.
-
-The original question returned `True`, but the paraphrased question returned `False`, even though both retrieved the relevant document.
+M04 expected `enough_evidence=True` for both questions. The original returned `True`; the paraphrase returned `False`, despite retrieving the same document.
 
 **Verified technical explanation**
-
-The retrieval function uses the following condition:
 
 ```python
 enough_evidence=bool(results and top_score >= deps.min_relevance)
 ```
 
-The original question received a relevance score of `0.4303`, which is above the threshold of `0.2`.
-
-The paraphrased question received `0.1925`, which is below the threshold.
-
-This explains why the two questions produced different `enough_evidence` values.
+The original score (0.4303) exceeded the 0.2 threshold; the paraphrased score (0.1925) did not.
 
 **Possible cause / interpretation**
 
-The hashing-based retrieval score is sensitive to the wording of the question. This can cause semantically similar questions to fall on different sides of the relevance threshold.
+Hashing-based retrieval scores can be sensitive to wording, causing equivalent questions to fall on opposite sides of the threshold. Whether this is an unacceptable defect depends on agreed requirements.
 
-This is a demonstrated difference in retrieval behaviour, but whether it is an unacceptable system defect depends on the group's agreed oracle and requirements.
-
-**Classification:** Unclassified — pending group review.
+**Classification:** Recorded as finding F04 / M04 in final report Section 3; not a confirmed software defect.
 
 **Oracle-based rationale**
 
-The existing test expectation is not met, and the failure has been independently reproduced. However, the group has not yet approved the final oracle or defect-classification criteria.
-
-Therefore, M04 is recorded as a failed test and an observed consistency issue, not a confirmed software defect.
+The test expectation was not met and the failure was independently reproduced. In final report Section 3, the group records this as finding F04 / M04, while noting that classification as a defect requires formally agreed expectations.
 
 **Known limitations**
 
-- The tests use a deterministic hashing-based embedding backend.
-- No real LLM is evaluated.
-- The evidence flag depends on a numerical relevance threshold.
-- The test does not establish whether the generated answer would be correct.
-- The group-wide oracle is not yet approved.
+- Deterministic hashing-based embeddings, not semantic embeddings from an online service.
+- No real LLM or generated-answer correctness evaluated.
+- `enough_evidence` depends on a numerical threshold.
 
 **Changes to SUT:** None.
 
@@ -242,29 +196,26 @@ nothing to commit, working tree clean
 
 | Field | Value |
 |---|---|
-| Action required | Review the M04 expectation and relevance-threshold behaviour with the group |
-| Responsible person | Yasaman (test owner); Marjan (independent reviewer) |
-| Related issue / PR | No issue or PR recorded for this review |
-| Status | Open — pending group review |
-| Date reviewed by group | Not yet recorded |
+| Action required | Preserve F04 / M04 as a documented finding |
+| Responsible person | Yasaman (owner); Marjan (reviewer) |
+| Related issue / PR | None recorded |
+| Status | Independent review complete; finding documented in final report |
 
 **Additional notes**
 
-The independent review reproduced the reported M04 failure and measured the relevance scores for both questions.
-
-The test results should remain separate from any final defect classification until the group approves its oracle.
+M04's failure and both relevance scores were independently reproduced. The final report records this as a finding rather than a confirmed defect.
 
 ---
 
 ## Group review checklist
 
-- [ ] Test case IDs and shared document contents match the approved proposal sheet.
-- [x] Expected behaviour and measurable pass conditions were identified from the existing tests.
-- [x] Environment, commit hash, configuration, and execution commands were recorded.
-- [x] Test results were independently reproduced and recorded in terminal output.
-- [x] Retrieval behaviour was distinguished from generated-answer correctness.
-- [x] The failed test was not automatically classified as a confirmed defect.
-- [x] The reported M04 failure was independently reproduced.
-- [x] Baseline SUT remained unchanged.
+- [x] Implemented test case IDs and shared document descriptions are consistent with the final report.
+- [x] Expected behaviour and measurable pass conditions identified from existing tests.
+- [x] Environment, commit, configuration, and commands recorded.
+- [x] Test results reproduced and recorded in terminal output.
+- [x] Retrieval distinguished from generated-answer correctness.
+- [x] Failure not automatically classified as a defect.
+- [x] M04 failure independently reproduced.
+- [x] Baseline SUT unchanged.
 
-**Final review status:** Independent execution completed. Group oracle approval and defect classification remain pending.
+**Final review status:** Independent execution completed; M04 is documented as finding F04 in the final report.
