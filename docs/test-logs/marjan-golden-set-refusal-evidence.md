@@ -5,46 +5,33 @@
 **Repository:** `g6-pydantic-agentic-rag-testing`  
 **Tested by:** Marjan Motafeghizenoz
 
-## 1. Purpose and Scope
+## Purpose and Scope
 
-This log records the execution and findings of G05, G06 and G07, focusing on insufficient evidence and refusal behaviour.
+This log records G05, G06 and G07. The tests check whether the application refuses questions or answers that lack supporting evidence.
 
-G05 checks refusal through the retrieval preflight gate. G06 and G07 use controlled model responses to check whether the application rejects unsupported claims accompanied by authentic quotations.
+G05 checks refusal before a model is called. G06 and G07 use `TestModel` to provide unsupported answers with real quotations.
 
-These tests do not evaluate a live language model or measure how frequently it generates unsupported answers.
+The tests do not evaluate a live language model or measure how often it produces incorrect answers.
 
-## Test setup — G05, G06 and G07
-
-| Field | Value |
-|---|---|
-| Test oracle / reference | Shared synthetic documents provide the reference facts; assertions in `test_golden_set.py` define the expected refusal behaviour. |
-| Test case IDs | G05, G06 and G07 |
-| Shared documents | Synthetic `benefits.txt` and `expenses.txt`; exact contents are reproduced below. |
-| Embedding backend | `HashingEmbeddingBackend` |
-| Embedding dimensions | 512 |
-| `min_relevance` | 0.20 |
-| `top_k` | 3 |
-| Model configuration | G05 checks refusal at the retrieval preflight gate without invoking a model. G06 and G07 use PydanticAI’s `TestModel` with controlled responses. No live language model is used. |
-| Baseline tag / commit | `baseline` / `b354c12` |
-| Pass conditions | All three tests require `answered=False` and empty citations. G05 additionally requires the exact `REFUSAL_TEXT`. |
----
-
-# Test Execution Record — MARJAN-GOLDEN-SET-01 (G05 and G06)
+Marjan’s original runs, the later group run and the Codex run are recorded separately.
 
 ## 1. Identification
 
 | Field | Value |
 |---|---|
-| Log entry ID | MARJAN-GOLDEN-SET-01 |
-| Tested by | Marjan Motafeghi |
-| Risk area / testing technique | Insufficient evidence and refusal; retrieval preflight and validation of controlled unsupported answers |
-| Test case IDs | G05 and G06 |
+| Test cases | G05, G06 and G07 |
 | Test file | `test_golden_set.py` |
-| Test methods | `GoldenSetRefusalTests.test_g05_refuses_unrelated_question`; `GoldenSetRefusalTests.test_g06_insufficient_annual_allowance_evidence` |
-| Reported working branch | `test/golden-set-refusal-marjan`; the exact checkout was not captured in the execution record. |
-| Suite | Extended Golden Set tests; this recorded run included G05 and G06, before G07 was added. |
+| G05 method | `GoldenSetRefusalTests.test_g05_refuses_unrelated_question` |
+| G06 method | `GoldenSetRefusalTests.test_g06_insufficient_annual_allowance_evidence` |
+| G07 method | `GoldenSetRefusalTests.test_g07_refuses_unsupported_parental_leave_amount` |
+| Reported branch | `test/golden-set-refusal-marjan`; the exact checkout was not captured in the original run record. |
+| Suite | Extended Golden Set tests |
+| Run records | MARJAN-GOLDEN-SET-01: G05 and G06; MARJAN-GOLDEN-SET-02: G07 |
+| Baseline tag / commit | `baseline` / `b354c12` |
 
 ## 2. Environment and Configuration
+
+These settings apply to Marjan’s three tests.
 
 | Field | Value |
 |---|---|
@@ -55,198 +42,74 @@ These tests do not evaluate a live language model or measure how frequently it g
 | Embedding dimensions | 512 |
 | `min_relevance` | 0.20 |
 | `top_k` | 3 |
-| Model configuration | G05: no model invoked when the retrieval preflight refuses. G06: `TestModel(call_tools=["retrieve"])`. |
-| External model requests | Disabled using `models.ALLOW_MODEL_REQUESTS = False`. |
+| G05 model | None; the retrieval gate refuses before a model is called |
+| G06 and G07 model | `TestModel(call_tools=["retrieve"])` |
+| External model requests | Disabled with `models.ALLOW_MODEL_REQUESTS = False` |
+
+Network traffic was not separately monitored during the original runs.
 
 ## 3. Test Setup and Oracle
 
-**Shared test documents**
+### Shared Test Documents
 
-Each test creates two in-memory documents:
+Each test adds two documents to an in-memory store.
 
-- `benefits.txt`: “Eligible employees receive twelve weeks of paid parental leave after six months of employment.”
-- `expenses.txt`: “Employees must submit expense reports within thirty days after business travel. The daily meal allowance is 70 dollars.”
+**benefits.txt**
 
-**Questions**
+> Eligible employees receive twelve weeks of paid parental leave after six months of employment.
 
-- **G05:** “Who won the 1978 World Cup?”
-- **G06:** “What is the annual meal allowance?”
+**expenses.txt**
 
-**Controlled model output — G06**
+> Employees must submit expense reports within thirty days after business travel. The daily meal allowance is 70 dollars.
 
-G06 supplies a deliberately unsupported response through `TestModel`:
+The documents give a leave duration and a daily meal allowance. They do not give a parental leave payment amount or an annual meal allowance.
 
-> The annual meal allowance is 70 dollars.
+### Questions and Expected Behaviour
 
-The response cites the authentic quotation:
+| Test | Question | Expected behaviour |
+|---|---|---|
+| G05 | Who won the 1978 World Cup? | Refuse because neither document answers the question. |
+| G06 | What is the annual meal allowance? | Reject the unsupported annual amount. |
+| G07 | What is the parental leave benefit amount in dollars? | Reject the unsupported payment amount. |
 
-> The daily meal allowance is 70 dollars.
+### Controlled Model Responses
 
-**Expected behaviour and evidence**
+These are not paraphrase tests. G06 and G07 use scripted answers.
 
-- **G05:** Refuse because neither document contains evidence answering the question.
-- **G06:** Reject the simulated annual claim because `expenses.txt` specifies a daily allowance, not an annual amount. The quotation is authentic but does not support the claim.
+| Test | Simulated answer | Real quotation used as a citation |
+|---|---|---|
+| G06 | The annual meal allowance is 70 dollars. | The daily meal allowance is 70 dollars. |
+| G07 | The parental leave benefit is 5000 dollars. | twelve weeks of paid parental leave |
 
-**Test oracle**
+The G06 quotation supports a daily amount, not an annual amount. The G07 quotation supports leave duration, not a payment of 5000 dollars.
 
-The synthetic documents provide the reference facts, and the test assertions define the expected refusal behaviour. These expectations are used to identify findings; a failed assertion alone does not establish a confirmed software defect.
+### Test Oracle
 
-**Measurable pass conditions**
+The synthetic documents provide the known facts. The test assertions define the expected refusal behaviour.
 
-- **G05:** `answer.answered is False`, `answer.citations == []`, and `answer.text == REFUSAL_TEXT`.
-- **G06:** `answer.answered is False` and `answer.citations == []` after the controlled response is supplied.
+A failed test is recorded as a finding. It is not automatically treated as a confirmed software defect.
 
-**Scope**
+### Pass Conditions
 
-- **G05:** Checks the final refusal returned by `answer_question()` through the retrieval preflight gate.
-- **G06:** Checks the final output of `answer_question()` after a simulated agent response with an authentic citation. It does not evaluate the answer-generation behaviour of a live language model.
-
-## 4. Execution and actual results
-
-**Exact command(s):**
-
-```bash
-python -m unittest test_golden_set.GoldenSetRefusalTests -v
-```
-
-**Result summary (number passed / failed / xfailed / xpassed / errors / subtests):**
-
-2 tests run: **1 passed, 1 failed**, 0 errors; `Ran 2 tests in 0.014s`. No xfail/xpass status reported.
-
-**Actual output / behaviour (include scores, top-ranked source and `enough_evidence` where relevant):**
-
-```text
-test_g05_refuses_unrelated_question (test_golden_set.GoldenSetRefusalTests.test_g05_refuses_unrelated_question) ... ok
-test_g06_insufficient_annual_allowance_evidence (test_golden_set.GoldenSetRefusalTests.test_g06_insufficient_annual_allowance_evidence) ... FAIL
-
-FAIL: test_g06_insufficient_annual_allowance_evidence
-AssertionError: True is not false : G06: The system must refuse an unsupported annual allowance.
-
-Ran 2 tests in 0.014s
-FAILED (failures=1)
-```
-
-G05 refused as expected. In G06, the assertion received `answer.answered=True` instead of the expected `False`. The run did not capture the exact retrieval score or ranked sources; do not infer them from this output.
-
-**Status:** **FAIL** overall (G05 PASS; G06 FAIL).
-
-**Evidence location (terminal output file, screenshot, CI URL, commit or log path):**
-
-Terminal output was shared in the project discussion. A permanent raw output file or CI link has not yet been recorded.
-
-**Reproduced by another group member? If yes, who and when:**
-
-Not yet independently reproduced.
-
-## 5. Findings and interpretation
-
-**Expected vs actual difference:**
-
-G06 expected the system to reject an unsupported *annual* amount. It instead accepted the simulated answer, setting `answered=True`. G05 behaved as expected.
-
-**Possible cause (hypothesis, not yet verified):**
-
-The citation checker validates whether a quoted span appears in a stored chunk, but may not verify that the quotation logically supports the complete claim. A genuine quote about a daily allowance can accompany an unsupported annual claim.
-
-**Classification:** **Unclassified reproduced test failure**, pending agreement on the oracle. Not yet a group-confirmed defect.
-
-**Oracle-based rationale for classification:**
-
-The test's refusal expectation is explicit, and the observed failure is real. However, the team has not formally approved whether semantic claim support is a requirement of the existing guardrail, so final defect versus design-limitation classification is pending.
-
-**Known limitations / confounding factors:**
-
-G06 uses a deliberately configured `TestModel`, not a real LLM. This demonstrates the validation path's response to an unsupported output, not the frequency of hallucinations by an actual model. No independent rerun, exact commit hash, dependency versions, or permanent terminal log is yet available.
-
-**Changes to SUT (none / temporary and reverted / other):**
-
-No production `agent.py` or `rag.py` changes reported; changes were made to Golden Set test code.
-
-## 6. Follow-up
-
-| Field | Value |
+| Test | Required result |
 |---|---|
-| Action required | Agree on oracle and classification; independently reproduce G06; capture exact environment, commit, and permanent test output |
-| Responsible person | Marjan (test author); group/reviewer for approval |
-| Status (open / under review / resolved) | Open — review pending |
-| Date reviewed by group | Pending |
+| G05 | `answer.answered is False`, `answer.citations == []`, and `answer.text == REFUSAL_TEXT` |
+| G06 | `answer.answered is False` and `answer.citations == []` |
+| G07 | `answer.answered is False` and `answer.citations == []` |
 
-**Additional notes:** This execution occurred before G07 was added to the test class. Therefore the command collected only G05 and G06.
+### Scope
 
----
+G05 checks the refusal returned by `answer_question()` through the retrieval gate.
 
-# Test Execution Record — MARJAN-GOLDEN-SET-02 (G07)
-
-## 1. Identification
-
-| Field | Value |
-|---|---|
-| Log entry ID | MARJAN-GOLDEN-SET-02 |
-
-| Tested by | Marjan Motafeghi |
-| Risk area / testing technique | Insufficient evidence and refusal; simulated unsupported-answer validation |
-| Test case ID(s) | G07 (Marjan's current ID; similar question appears as Christian's G03, but tests a different layer) |
-| Test method(s) / file | `test_golden_set.py`: `GoldenSetRefusalTests.test_g07_refuses_unsupported_parental_leave_amount` |
-| Branch | `test/golden-set-refusal-marjan` (working branch reported; exact checkout at execution not independently captured) |
-| Commit hash (`git rev-parse HEAD`) | Pending verification |
-| Baseline or extended suite | Extended Golden Set; G07 method executed individually |
-
-## 2. Environment and configuration
-
-| Field | Value |
-|---|---|
-| Operating system | macOS (MacBook Air; exact version not captured) |
-| pytest version | Not applicable to recorded command (`unittest` was used) |
-| Virtual environment | Project `.venv` activated |
-| Embedding backend | `HashingEmbeddingBackend` |
-| Embedding dimensions | 512 |
-| `min_relevance` | 0.20 |
-| `top_k` | 3 |
-| Model / TestModel / FunctionModel / none | PydanticAI `TestModel(call_tools=["retrieve"])` |
-| External API calls (yes/no) | No external model calls allowed (`models.ALLOW_MODEL_REQUESTS = False` during test); network traffic not independently monitored |
-
-## 3. Test setup and oracle
-
-**Shared test documents / synthetic data (exact content or file reference):**
-
-- `benefits.txt`: `Eligible employees receive twelve weeks of paid parental leave after six months of employment.`
-- `expenses.txt`: `Employees must submit expense reports within thirty days after business travel. The daily meal allowance is 70 dollars.`
-
-Both documents are added to an in-memory vector store by the test setup.
-
-**Original question / input:**
-
-`What is the parental leave benefit amount in dollars?`
-
-**Paraphrased question / transformed input (if applicable):**
-
-Not a paraphrase test. A simulated model output is injected: `The parental leave benefit is 5000 dollars.`
-
-**Expected behaviour (answer / refuse / other):**
-
-Refuse the unsupported monetary amount because the document describes the *duration* of paid leave, not the benefit amount in dollars.
-
-**Expected source, evidence, citation or refusal reason:**
-
-`benefits.txt` contains `twelve weeks of paid parental leave`. This is a genuine quote but does not justify the simulated claim of 5000 dollars.
-
-**Test oracle (approved case, documented rule, metamorphic relation, etc.):**
-
-Provisional Golden Set refusal expectation and explicit assertions. Group-wide oracle approval and defect classification are pending.
-
-**Measurable pass condition(s):**
-
-`answer.answered is False` and `answer.citations == []` after the simulated unsupported output.
-
-**Scope of assertion (retrieval / agent output / citation / other):**
-
-Final `answer_question()` output and citation validation using a simulated model response. This does not test a real LLM's generated answer.
+G06 and G07 check the final result of `answer_question()` after a controlled model response. They test application validation, not live-model answer quality.
 
 ## 4. Execution and Actual Results
 
 ### Run 1 — G05 and G06
 
-This run took place before G07 was added to the test class, so the command executed only G05 and G06.
+**Log entry:** MARJAN-GOLDEN-SET-01
+
+This run happened before G07 was added, so the command ran only G05 and G06.
 
 **Command**
 
@@ -267,11 +130,15 @@ Ran 2 tests in 0.014s
 FAILED (failures=1)
 ```
 
-**Result:** 2 tests run; 1 passed, 1 failed, 0 errors.
+**Result:** 1 passed, 1 failed, 0 errors.
 
-G05 returned the expected refusal. G06 accepted the simulated annual allowance of 70 dollars, returning `answer.answered=True` instead of the expected `False`.
+G05 refused as expected. G06 accepted the simulated annual amount and returned `answer.answered=True` instead of `False`.
 
 ### Run 2 — G07
+
+**Log entry:** MARJAN-GOLDEN-SET-02
+
+G07 was run separately.
 
 **Command**
 
@@ -291,53 +158,126 @@ Ran 1 test in 0.014s
 FAILED (failures=1)
 ```
 
-**Result:** 1 test run; 0 passed, 1 failed, 0 errors.
+**Result:** 0 passed, 1 failed, 0 errors.
 
-G07 accepted the simulated parental leave benefit of 5000 dollars, returning `answer.answered=True` instead of the expected `False`. The cited document describes leave duration but contains no monetary benefit amount.
+G07 accepted the simulated payment of 5000 dollars and returned `answer.answered=True` instead of `False`.
 
-### Overall Results — G05, G06 and G07
+### Overall Results
 
-The table summarises the two recorded runs above, rather than a separate execution of all three tests together.
+This table combines the results of the two separate runs.
 
 | Test | Result | Observation |
 |---|---|---|
-| G05 | PASS | The system refused the unrelated question. |
-| G06 | FAIL | The system accepted the simulated unsupported annual allowance. |
-| G07 | FAIL | The system accepted the simulated unsupported parental leave amount. |
+| G05 | PASS | The application refused the unrelated question. |
+| G06 | FAIL | The application accepted the unsupported annual allowance. |
+| G07 | FAIL | The application accepted the unsupported parental leave payment. |
 
-**Evidence:** Terminal output shared in the project discussion.
+### Evidence Location
 
-Exact retrieval scores and ranked source lists were not captured in these runs.
+The terminal output was shared in the project discussion. No separate raw-output file or CI link was recorded for these original runs.
+
+Retrieval scores and ranked sources were not saved. G07’s `enough_evidence` value was not printed separately.
+
+### Later Verification — Group Run
+
+The repository contains these saved logs:
+
+- `docs/test-logs/coverage-baseline-2026-10-15.txt`
+- `docs/test-logs/coverage-extended-2026-10-15.txt`
+
+| Reference | Revision |
+|---|---|
+| Tested application revision | `fb894b8fba719cdfa5bd04cb4481cdc2938f25ef` |
+| Commit containing the execution evidence | `bd6f266` |
+
+The combined group run recorded **17 passed and 4 failed out of 21 tests**.
+
+G03, G06, G07 and M04 failed. G05 passed.
+
+### Later Verification — Codex Run
+
+Codex separately ran the original and extended suites during the repository review. This was an automated check, not a run by another group member.
+
+**Reviewed revision**
+
+`25ed55244afa2179e06e169be3d5f1f61b8e31dd`
+
+The review found no changes in `agent.py`, `rag.py`, `test_typed_rag.py` or `test_golden_set.py` between this revision and `fb894b8`.
+
+| Environment | Version |
+|---|---|
+| Operating system | Linux |
+| Python | 3.12.14 |
+| pytest | 9.1.1 |
+| pytest-cov | 7.1.0 |
+
+**Command**
+
+```bash
+python -m pytest test_typed_rag.py test_golden_set.py --cov=agent --cov=rag --cov-branch --cov-report=term --tb=short
+```
+
+**Result**
+
+```text
+4 failed, 17 passed in 41.30s
+```
+
+The same four cases failed: G03, G06, G07 and M04.
+
+### Comparison of Results
+
+| Test | Marjan’s original runs | Group run | Codex run |
+|---|---|---|---|
+| G05 | PASS | PASS | PASS |
+| G06 | FAIL | FAIL | FAIL |
+| G07 | FAIL | FAIL | FAIL |
+
+The later runs reproduced the outcomes. Their environment and revision details do not describe Marjan’s earlier runs.
 
 ## 5. Findings and Interpretation
 
-### Expected and Observed Behaviour
+### Expected vs Actual Behaviour
 
-G05 passed: the application refused the unrelated question as expected.
+G05 worked as expected.
 
-G06 failed: the application accepted a simulated annual meal allowance of 70 dollars, although the document specifies only a daily allowance.
+G06 and G07 accepted unsupported monetary claims with real quotations. G06 used a daily allowance quotation to support an annual claim. G07 used a leave-duration quotation to support a payment claim.
 
-G07 failed: the application accepted a simulated parental leave benefit of 5000 dollars, although the document specifies leave duration but no monetary amount. The response returned `answer.answered=True`, while the test expected `False`.
+### Technical Explanation
 
-### Interpretation
+Code review showed that citation validation checks whether the source and chunk exist and whether the quotation appears in that chunk. It normalises whitespace and letter case before comparing the text.
 
-G06 and G07 used authentic quotations alongside unsupported claims. The findings indicate a limitation in answer validation: quotation authenticity does not establish that the quoted text supports the claim.
+It does not check whether the quotation supports the meaning of the answer’s claim.
 
-These responses were supplied through `TestModel`. The results do not demonstrate that a live language model generated the incorrect claims or establish real-model hallucination rates.
+A real quotation can therefore pass validation while accompanying an unsupported answer.
 
 ### Classification
 
-The failures are documented findings, not confirmed software defects. Classification as a defect depends on whether claim-level semantic validation is an intended application requirement.
+The group report records these as **F02 / G06** and **F03 / G07**.
 
-### Distinction Between G03 and G07
+They are documented findings, not confirmed software defects. Defect classification depends on whether checking claim-level support is an intended application requirement.
 
-Both tests ask about the missing parental leave amount, but they check different stages. G03 checks `retrieve_evidence()` and its `enough_evidence` flag. G07 checks final-answer validation through `answer_question()`.
+Reproducing a failure confirms the observed behaviour. It does not by itself approve the oracle or establish a software defect.
 
-### Changes to the System Under Test
+### Known Limitations
 
-No production changes to `agent.py` or `rag.py` were reported; changes concerned test code only.
+The tests use two short synthetic documents and local hashing embeddings.
+
+G06 and G07 use `TestModel` responses. They do not show that a live model generated these claims or measure how often such errors occur.
+
+The original runs did not capture exact retrieval scores or ranked sources.
+
+### Changes to SUT
+
+No production changes to `agent.py` or `rag.py` were reported. Changes concerned Golden Set test code.
+
+### Additional Notes — G03 and G07
+
+G03 and G07 ask about the same missing parental leave amount but test different stages.
+
+G03 checks `retrieve_evidence()` and its `enough_evidence` flag. G07 checks the final answer through `answer_question()` after a controlled model response.
 
 ## 6. Follow-up
 
-- Review whether claim-level semantic validation is an intended application requirement.
+- Review whether claim-level support is an intended application requirement.
 - Use that requirement to distinguish software defects from design limitations.
