@@ -1,0 +1,6 @@
+commit=8c2842f6aadca2baaa1637f8ffa18987182f28ec python=3.12.3 os=Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39
+OPENAI_API_KEY set: False
+chunks: [('benefits.txt', 'benefits.txt:c1'), ('expenses.txt', 'expenses.txt:c1')]
+G03/G07         enough_evidence=True  benefits.txt=0.2182, expenses.txt=0.0642 :: What is the parental leave benefit amount in dollars?
+M04 original    enough_evidence=True  expenses.txt=0.4303, benefits.txt=0.0000 :: What is the daily meal allowance?
+M04 paraphrase  enough_evidence=False expenses.txt=0.1925, benefits.txt=0.0000 :: How much is the meal allowance per day?
