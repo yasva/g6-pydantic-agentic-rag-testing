@@ -156,6 +156,10 @@ None
 
 **Additional notes:**
 
+**Group verification note (2026-10-30):**
+
+The repository's `baseline` tag was independently checked using `git rev-parse baseline^{commit}` and resolves to `b354c12a55ce3033aec13dfcbcaa15c284cc6408`, matching Section 5 of the group report. The `47eb704` reference in the original test log has been preserved as recorded by the test author. Its relationship to the verified baseline has not been established. This note does not change the original test execution record.
+
 
 ---
 
