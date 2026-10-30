@@ -13,6 +13,23 @@ from rag import HashingEmbeddingBackend, InMemoryVectorStore
 from pydantic_ai.models.test import TestModel
 
 
+# SHARED TEST DOCUMENTS
+#
+# Use these same synthetic documents when proposing initial cases:
+#
+# benefits.txt:
+# "Eligible employees receive twelve weeks of paid parental leave after six
+# months of employment."
+#
+# expenses.txt:
+# "Employees must submit expense reports within thirty days after business
+# travel. The daily meal allowance is 70 dollars."
+#
+# If a proposed case needs additional or conflicting information, describe the
+# proposed change in the Word proposal sheet. The group must approve changes so
+# all final tests use the same agreed test documents.
+
+
 # Golden Set Retrieval Tests
 class GoldenSetRetrievalTests(unittest.TestCase):
     """Retrieval checks for the agreed shared test documents."""
@@ -477,44 +494,6 @@ class GoldenSetFalseCitation(unittest.TestCase):
         # Citations is empty
         self.assertEqual([], answer.citations)
 
-
-# SHARED TEST DOCUMENTS
-#
-# Use these same synthetic documents when proposing initial cases:
-#
-# benefits.txt:
-# "Eligible employees receive twelve weeks of paid parental leave after six
-# months of employment."
-#
-# expenses.txt:
-# "Employees must submit expense reports within thirty days after business
-# travel. The daily meal allowance is 70 dollars."
-#
-# If a proposed case needs additional or conflicting information, describe the
-# proposed change in the Word proposal sheet. The group must approve changes so
-# all final tests use the same agreed test documents.
-
-
-
-# WORK SEQUENCE
-#
-# TODO 1: Each member drafts 2–3 cases in their assigned risk area in the shared
-#         Word proposal sheet.
-# TODO 2: Review the expected evidence, answer/refusal decision, and pass
-#         condition together.
-# TODO 3: Remove duplicates and check that the cases cover all five planned
-#         risks: incorrect/irrelevant retrieval, unsupported answers,
-#         incorrect citations, answering without enough evidence, and
-#         inconsistent behaviour for equivalent questions.
-# TODO 4: Agree on and record the final cases and shared test documents.
-# TODO 5: Implement only the approved automated tests in THIS file:
-#         test_golden_set.py.
-# TODO 6: Follow the deterministic test patterns in test_typed_rag.py and avoid
-#         external API calls in automated tests where possible.
-# TODO 7: Run the new tests and then the complete suite. Save the command,
-#         environment, and results.
-# TODO 8: Compare baseline and extended results in the same environment.
-#         Record findings, blockers, limitations, and remaining work.
 
 if __name__ == "__main__":
     unittest.main()
